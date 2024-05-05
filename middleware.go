@@ -5,7 +5,6 @@ import (
 	"log"
 	"time"
 
-	"github.com/go-redis/redis_rate/v10"
 	"github.com/gofiber/fiber/v2"
 	"github.com/redis/go-redis/v9"
 )
@@ -34,17 +33,26 @@ func (r *RateLimitMiddleware) Handler() fiber.Handler {
 		if err != nil {
 			log.Fatal("pipe not executing", err)
 		}
-		ipCount := pipeCmd[0].(*redis.BoolCmd)
+		ipSetExpire := pipeCmd[0].(*redis.BoolCmd)
 		ipCountInc := pipeCmd[1].(*redis.IntCmd)
-		ttl := pipeCmd[2].(*redis.DurationCmd)
-		fmt.Printf("%s\n %s\n %s\n", ipCount, ipCountInc, ttl)
-		ctx := c.Context()
-		res, _ := r.limiter.Allow(ctx, fmt.Sprintf(RateRequest, "username"), redis_rate.Limit{
-			Rate:   10,
-			Burst:  10,
-			Period: time.Second,
-		})
-		if res.Allowed <= 0 {
+		ttlcmd := pipeCmd[2].(*redis.DurationCmd)
+		fmt.Printf("%s\n %s\n %s\n", ipSetExpire, ipCountInc, ttlcmd)
+
+		if err := ipSetExpire.Err(); err != nil {
+			log.Fatal("Something wrong with SetNX", err)
+		}
+
+		var ipCount int64
+
+		if ipCount, err = ipCountInc.Result(); err != nil {
+			log.Fatal("Failed to get ip count", err)
+		}
+
+		if _, err := ttlcmd.Result(); err != nil {
+			log.Fatal("Failed to get ttl for current ip", err)
+		}
+
+		if 10-ipCount <= 0 {
 			log.Printf("Reached IP rate limit on: %s on %s", c.IP(), c.Path())
 			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
 				"success": false,

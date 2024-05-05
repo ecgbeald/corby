@@ -4,14 +4,12 @@ import (
 	"context"
 	"log"
 
-	redisrate "github.com/go-redis/redis_rate/v10"
 	"github.com/redis/go-redis/v9"
 )
 
 type RedisRateLimiter struct {
 	cli *redis.Client
 	ctx context.Context
-	*redisrate.Limiter
 }
 
 func NewRedisRateLimiter(str string) *RedisRateLimiter {
@@ -25,5 +23,5 @@ func NewRedisRateLimiter(str string) *RedisRateLimiter {
 	}
 	log.Printf("Successfully connected to redis: %s", pong)
 
-	return &RedisRateLimiter{cli, ctx, redisrate.NewLimiter(cli)}
+	return &RedisRateLimiter{cli, ctx}
 }
