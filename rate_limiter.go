@@ -9,6 +9,8 @@ import (
 )
 
 type RedisRateLimiter struct {
+	cli *redis.Client
+	ctx context.Context
 	*redisrate.Limiter
 }
 
@@ -16,9 +18,12 @@ func NewRedisRateLimiter(str string) *RedisRateLimiter {
 	cli := redis.NewClient(&redis.Options{
 		Addr: str,
 	})
-	_, err := cli.Ping(context.Background()).Result()
+	ctx := context.Background()
+	pong, err := cli.Ping(ctx).Result()
 	if err != nil {
 		log.Fatal("Cannot ping to redis:", err)
 	}
-	return &RedisRateLimiter{redisrate.NewLimiter(cli)}
+	log.Printf("Successfully connected to redis: %s", pong)
+
+	return &RedisRateLimiter{cli, ctx, redisrate.NewLimiter(cli)}
 }
