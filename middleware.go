@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"strconv"
 	"time"
 
 	"github.com/gofiber/fiber/v2"
@@ -43,16 +44,22 @@ func (r *RateLimitMiddleware) Handler() fiber.Handler {
 		}
 
 		var ipCount int64
+		var ttl time.Duration
 
 		if ipCount, err = ipCountInc.Result(); err != nil {
 			log.Fatal("Failed to get ip count", err)
 		}
 
-		if _, err := ttlcmd.Result(); err != nil {
+		if ttl, err = ttlcmd.Result(); err != nil {
 			log.Fatal("Failed to get ttl for current ip", err)
 		}
 
-		if 10-ipCount <= 0 {
+		remaining := 10 - ipCount
+
+		c.Set("X-RateLimit-Remaining", strconv.FormatInt(remaining, 10))
+		c.Set("X-RateLimit-Reset", strconv.Itoa(int(ttl.Seconds())))
+
+		if remaining <= 0 {
 			log.Printf("Reached IP rate limit on: %s on %s", c.IP(), c.Path())
 			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
 				"success": false,
